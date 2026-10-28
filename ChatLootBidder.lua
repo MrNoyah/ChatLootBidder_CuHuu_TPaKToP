@@ -82,6 +82,46 @@ local function LoadVariables()
   ChatLootBidder_Store.DefaultMaxSoftReserves = 1
 end
 
+local function NormalizeKeyword(raw)
+  if not raw then return nil end
+
+  local t = string.lower(raw)
+
+  if string.find(t, "ms") then
+    return "ms"
+  end
+
+  if string.find(t, "os") then
+    return "os"
+  end
+
+  if string.find(t, "twink") then
+    return "twink"
+  end
+
+  if string.find(t, "roll") then
+    return "roll"
+  end
+
+  if string.find(t, "cancel") then
+    return "cancel"
+  end
+
+  if string.find(t, "sr") then
+    return "sr"
+  end
+
+  if string.find(t, "real") then
+    return "real"
+  end
+
+  if string.find(t, "notes") then
+    return "notes"
+  end
+
+  return raw
+end
+
 local function Trim(str)
   local _start, _end, _match = string.find(str, '^%s*(.-)%s*$')
   return _match or ""
@@ -128,8 +168,8 @@ function ChatLootBidder:SetPropValue(propName, propValue, prefix)
     Debug((T[propName] or propName) .. " is " .. tostring(v))
 
     -- Special Handlers for specific properties here
-    if propName == "DefaultSessionMode" then
-      ChatLootBidder:RedrawStage()
+    if propName == "MinBid" and session then
+      for _, s in pairs(session) do s.minBid = ChatLootBidder_Store.MinBid end
     end
 
   else
@@ -809,7 +849,7 @@ function ChatLootBidder:Start(items, minBid, mode)
         currentItem
     }
     
-    local minimumBid = (minBid ~= nil and tostring(minBid)) or tostring(ChatLootBidder_Store.MinBid)
+    local minimumBid = minBid or ChatLootBidder_Store.MinBid
     local bidAddonMessage = "mode="..mode..",minimumBid="..minimumBid..",MaxOsBid="..tostring(ChatLootBidder_Store.MaxOsBid)..",MaxTwinkBid="..tostring(ChatLootBidder_Store.MaxTwinkBid)..",items="..string.gsub(currentItem, ",", "~~~")
     
     local itemName = ParseItemNameFromItemLink(currentItem)
@@ -1170,7 +1210,8 @@ local InitSlashCommands = function()
       BidSummary()
     elseif commandlist[1] == "start" then
       local itemLinks = GetItemLinks(message)
-      local minBidOptional = ToWholeNumber(commandlist[getn(commandlist)], 1)
+      local lastToken = commandlist[getn(commandlist)]
+      local minBidOptional = tonumber(lastToken) and ToWholeNumber(lastToken, 1) or nil
       ChatLootBidder:Start(itemLinks, minBidOptional)
 	elseif commandlist[1] == "history" then
 		ChatLootBidder:PrintLootHistory()
@@ -1366,9 +1407,10 @@ function ChatFrame_OnEvent(event)
         local cancel = itemSession["cancel"]
         local notes = itemSession["notes"]
         local real = itemSession["real"]
-		local minimumBid = itemSession['minBid'] ~= nil and tonumber(itemSession['minBid']) or ChatLootBidder_Store.MinBid
+		local minimumBid = itemSession.minBid or ChatLootBidder_Store.MinBid
         local bid = SplitBySpace(string.sub(arg1, itemIndexEnd + 1))
-        local tier = bid[1] and string.lower(bid[1]) or nil
+        local bidType = NormalizeKeyword(bid[1])
+	local tier = bidType and string.lower(bidType) or nil
         local amt = bid[2] and string.lower(bid[2]) or nil
         
         if IsValidTier(tier) then
